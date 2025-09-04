@@ -1,0 +1,102 @@
+# .github/workflows/ci-cd.yml
+name: 🚀 CI/CD Pipeline
+
+# When should this workflow run?
+on:
+  # Run on every push to main branch
+  push:
+    branches: [ main, master ]
+  # Run on every pull request to main branch
+  pull_request:
+    branches: [ main, master ]
+  # Allow manual triggering
+  workflow_dispatch:
+
+# Define the jobs
+jobs:
+  # Job 1: Test our code
+  test:
+    name: 🧪 Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    # Step 1: Get our code
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    # Step 2: Set up Node.js (needed for our tests)
+    - name: 🟢 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    # Step 3: Run our tests
+    - name: 🧪 Run tests
+      run: |
+        echo "Running our awesome tests..."
+        node test.js
+        echo "✅ All tests completed!"
+        
+    # Step 4: Check code quality (linting)
+    - name: 🔍 Lint code
+      run: |
+        echo "Checking code quality..."
+        npm run lint
+        echo "✅ Code looks great!"
+
+  # Job 2: Deploy to GitHub Pages (only after tests pass)
+  deploy:
+    name: 🌐 Deploy to Production
+    runs-on: ubuntu-latest
+    needs: test  # This job only runs if 'test' job succeeds
+    
+    # Only deploy on pushes to main/master, not on pull requests
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    
+    steps:
+    # Step 1: Get our code
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    # Step 2: Deploy to GitHub Pages
+    - name: 🚀 Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./
+        commit_message: '🚀 Deploy: ${{ github.event.head_commit.message }}'
+        
+    # Step 3: Celebrate! 
+    - name: 🎉 Deployment Success
+      run: |
+        echo "🎉 Your app is now live!"
+        echo "🌐 Visit: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+        echo "⭐ Great job on your first CI/CD pipeline!"
+
+  # Job 3: Notify about the deployment
+  notify:
+    name: 📢 Send Notifications  
+    runs-on: ubuntu-latest
+    needs: [test, deploy]
+    if: always() # Run even if previous jobs fail
+    
+    steps:
+    - name: 📊 Report Status
+      run: |
+        if [[ "${{ needs.test.result }}" == "success" && "${{ needs.deploy.result }}" == "success" ]]; then
+          echo "✅ PIPELINE SUCCESS!"
+          echo "🧪 Tests: PASSED"
+          echo "🚀 Deployment: SUCCESS"
+          echo "🌐 Your app is live and ready!"
+        elif [[ "${{ needs.test.result }}" == "failure" ]]; then
+          echo "❌ PIPELINE FAILED!"
+          echo "🧪 Tests: FAILED"
+          echo "🔧 Please check your code and fix the failing tests"
+        elif [[ "${{ needs.deploy.result }}" == "failure" ]]; then
+          echo "⚠️  PARTIAL SUCCESS"
+          echo "🧪 Tests: PASSED"
+          echo "❌ Deployment: FAILED"
+          echo "🔧 Please check deployment settings"
+        else
+          echo "ℹ️  Pipeline completed with mixed results"
+        fi
